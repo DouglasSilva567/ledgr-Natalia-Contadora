@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ledgr — Extrator de Faturas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.47.0/tabler-icons.min.css">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --ink:#1a1a1a;--ink2:#4a4a4a;--ink3:#8a8a8a;
+    --paper:#fafaf7;--paper2:#f2f0ea;--paper3:#e8e4da;
+    --accent:#2d5a3d;--accent2:#4a8c62;--accentlt:#e8f0eb;
+    --warn:#c47c2b;--warnlt:#fdf3e3;
+    --danger:#b84040;--dangerlt:#fbeaea;
+    --info:#2b5fa4;--infolt:#e6eef8;
+    --border:#d4d0c8;--radius:10px;
+  }
+  html,body{min-height:100vh;background:var(--paper);color:var(--ink);font-family:'Syne',sans-serif}
+  .app{max-width:960px;margin:0 auto;padding:2.5rem 2rem}
+
+  /* HEADER */
+  .header{display:flex;align-items:baseline;justify-content:space-between;gap:16px;margin-bottom:2.5rem;border-bottom:1.5px solid var(--ink);padding-bottom:1rem;flex-wrap:wrap}
+  .logo{display:flex;align-items:baseline;gap:14px}
+  .logo-mark{font-family:'DM Serif Display',serif;font-size:34px;letter-spacing:-1px;color:var(--ink)}
+  .logo-mark span{color:var(--accent)}
+  .tagline{font-size:11px;color:var(--ink3);letter-spacing:2px;text-transform:uppercase;font-family:'DM Mono',monospace}
+  .header-meta{font-size:11px;color:var(--ink3);font-family:'DM Mono',monospace;text-align:right}
+
+  /* DROP ZONE */
+  .drop-zone{border:1.5px dashed var(--border);border-radius:var(--radius);padding:3rem 2rem;text-align:center;cursor:pointer;transition:all .2s;background:var(--paper2);position:relative;user-select:none}
+  .drop-zone:hover,.drop-zone.drag{border-color:var(--accent);background:var(--accentlt)}
+  .drop-icon{font-size:44px;color:var(--ink3);margin-bottom:1rem;display:block}
+  .drop-title{font-size:17px;font-weight:500;margin-bottom:8px}
+  .drop-sub{font-size:13px;color:var(--ink3);font-family:'DM Mono',monospace}
+  .drop-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+
+  /* PROGRESS */
+  .status-bar{margin-top:.75rem;font-size:12px;font-family:'DM Mono',monospace;color:var(--ink3);min-height:18px;text-align:center;transition:color .2s}
+  .status-bar.ok{color:var(--accent2)}
+  .status-bar.err{color:var(--danger)}
+  .status-bar.loading{color:var(--warn)}
+  .loading-bar{height:3px;background:var(--paper3);border-radius:2px;overflow:hidden;margin-top:8px;display:none}
+  .loading-bar.active{display:block}
+  .loading-fill{height:100%;background:var(--accent);border-radius:2px;transition:width .4s ease;width:0}
+
+  /* SUMMARY */
+  .summary{display:none;margin-top:2.5rem}
+  .summary.visible{display:block}
+
+  /* KPIs */
+  .kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:2rem}
+  .kpi{background:var(--paper2);border-radius:var(--radius);border:.5px solid var(--border);padding:.9rem 1.1rem}
+  .kpi-label{font-size:10px;font-family:'DM Mono',monospace;color:var(--ink3);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:5px}
+  .kpi-val{font-size:22px;font-weight:500;color:var(--ink);line-height:1.1}
+  .kpi-sub{font-size:11px;color:var(--ink3);margin-top:3px;font-family:'DM Mono',monospace}
+
+  /* SECTION */
+  .section-title{font-family:'DM Serif Display',serif;font-size:19px;font-style:italic;margin-bottom:1rem;color:var(--ink)}
+
+  /* CATEGORIES */
+  .cat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:2rem}
+  .cat-card{background:var(--paper2);border:.5px solid var(--border);border-radius:var(--radius);padding:.75rem 1rem;display:flex;gap:12px;align-items:flex-start}
+  .cat-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;margin-top:3px}
+  .cat-info{flex:1;min-width:0}
+  .cat-name{font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px}
+  .cat-amt{font-size:13px;font-family:'DM Mono',monospace;color:var(--ink2)}
+  .cat-pct{font-size:10px;color:var(--ink3);font-family:'DM Mono',monospace}
+  .bar-bg{height:3px;background:var(--paper3);border-radius:2px;margin-top:6px}
+  .bar-fill{height:100%;border-radius:2px;transition:width .6s ease}
+
+  /* PORTADORES */
+  .port-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-bottom:2rem}
+  .port-card{background:var(--paper);border:.5px solid var(--border);border-radius:var(--radius);padding:.8rem 1rem}
+  .port-name{font-size:13px;font-weight:500;margin-bottom:2px}
+  .port-final{font-size:10px;font-family:'DM Mono',monospace;color:var(--ink3);margin-bottom:.5rem}
+  .port-total{font-size:18px;font-weight:500;font-family:'DM Mono',monospace;color:var(--ink)}
+  .port-sub{font-size:10px;color:var(--ink3);font-family:'DM Mono',monospace;margin-top:2px}
+
+  /* INTERNATIONAL */
+  .intl-banner{background:var(--infolt);border:.5px solid #b5d4f4;border-radius:var(--radius);padding:.8rem 1rem;margin-bottom:1.5rem;font-size:13px;color:var(--info);display:flex;align-items:center;gap:8px}
+
+  /* TABLE */
+  .table-controls{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:.75rem;flex-wrap:wrap}
+  .filter-row{display:flex;gap:6px;flex-wrap:wrap}
+  .filter-btn{padding:4px 12px;border-radius:20px;font-size:11px;font-family:'DM Mono',monospace;border:.5px solid var(--border);background:var(--paper2);cursor:pointer;transition:all .15s;color:var(--ink2)}
+  .filter-btn.active{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .search-input{padding:5px 10px;border:.5px solid var(--border);border-radius:6px;font-size:12px;font-family:'DM Mono',monospace;background:var(--paper);color:var(--ink);outline:none;width:180px}
+  .search-input:focus{border-color:var(--accent)}
+  .table-wrap{background:var(--paper);border:.5px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:2rem}
+  .table-hdr{padding:.65rem 1rem;background:var(--paper2);border-bottom:.5px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .table-hdr-title{font-size:12px;font-weight:500;font-family:'DM Mono',monospace;color:var(--ink2)}
+  .table-hdr-total{font-size:12px;font-family:'DM Mono',monospace;color:var(--ink3)}
+  .scroll-tbl{max-height:380px;overflow-y:auto}
+  .tbl{width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed}
+  .tbl th{padding:.55rem .75rem;background:var(--paper2);color:var(--ink3);font-weight:500;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.8px;text-transform:uppercase;text-align:left;border-bottom:.5px solid var(--border);position:sticky;top:0;z-index:1;cursor:pointer;white-space:nowrap}
+  .tbl th:hover{color:var(--ink)}
+  .tbl td{padding:.5rem .75rem;border-bottom:.5px solid var(--paper3);vertical-align:middle;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .tbl tr:last-child td{border-bottom:none}
+  .tbl tr:hover td{background:var(--paper2)}
+  .col-data{width:58px}.col-desc{width:auto;min-width:160px}.col-cidade{width:100px}.col-cat{width:110px}.col-port{width:115px}.col-val{width:90px}
+
+  /* BADGES */
+  .badge{display:inline-block;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:500;font-family:'DM Mono',monospace;white-space:nowrap}
+  .bg-green{background:#e8f0eb;color:#2d5a3d}
+  .bg-blue{background:#e6eef8;color:#2b5fa4}
+  .bg-amber{background:#fdf3e3;color:#c47c2b}
+  .bg-red{background:#fbeaea;color:#b84040}
+  .bg-purple{background:#f0eefa;color:#6b4fbb}
+  .bg-teal{background:#e1f5f0;color:#0f6e56}
+  .bg-brown{background:#f5ede6;color:#8b5e3c}
+  .bg-gray{background:#f2f0ea;color:#5f5e5a}
+
+  /* AMOUNTS */
+  .amt-neg{color:var(--accent);font-family:'DM Mono',monospace}
+  .amt-pos{color:var(--ink2);font-family:'DM Mono',monospace}
+  .amt-intl{color:var(--info);font-family:'DM Mono',monospace}
+
+  /* ACTIONS */
+  .actions{display:flex;gap:12px;flex-wrap:wrap;padding-top:.5rem}
+  .btn{padding:.7rem 1.4rem;border-radius:var(--radius);font-size:13px;font-weight:500;font-family:'Syne',sans-serif;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:8px;border:.5px solid;text-decoration:none}
+  .btn-primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .btn-primary:hover{background:var(--accent2);border-color:var(--accent2)}
+  .btn-secondary{background:var(--info);color:#fff;border-color:var(--info)}
+  .btn-secondary:hover{opacity:.88}
+  .btn-outline{background:transparent;color:var(--ink);border-color:var(--border)}
+  .btn-outline:hover{background:var(--paper2)}
+  .btn:disabled{opacity:.4;cursor:default;pointer-events:none}
+
+  /* FOOTER */
+  .footer{margin-top:3rem;padding-top:1rem;border-top:.5px solid var(--border);font-size:11px;color:var(--ink3);font-family:'DM Mono',monospace;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
+
+  /* SCROLLBAR */
+  .scroll-tbl::-webkit-scrollbar{width:5px}
+  .scroll-tbl::-webkit-scrollbar-track{background:var(--paper2)}
+  .scroll-ttml::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="header">
+    <div class="logo">
+      <div class="logo-mark">ledg<span>r</span></div>
+      <div class="tagline">extrator de faturas · análise contábil</div>
+    </div>
+    <div class="header-meta" id="headerMeta">Itaú Empresas · PDF → Excel</div>
+  </header>
+
+  <div class="drop-zone" id="dropZone">
+    <i class="ti ti-file-invoice drop-icon" aria-hidden="true"></i>
+    <div class="drop-title">Arraste sua fatura PDF aqui</div>
+    <div class="drop-sub">ou clique para selecionar · Itaú Empresas e similares</div>
+    <input type="file" accept=".pdf" id="fileInput" aria-label="Selecionar arquivo PDF da fatura">
+  </div>
+  <div class="loading-bar" id="loadingBar"><div class="loading-fill" id="loadingFill"></div></div>
+  <div class="status-bar" id="statusBar" role="status">Aguardando arquivo…</div>
+
+  <section class="summary" id="summary" aria-label="Análise da fatura">
+
+    <div class="kpi-row" id="kpiRow"></div>
+
+    <div class="section-title">Distribuição por categoria</div>
+    <div class="cat-grid" id="catGrid"></div>
+
+    <div class="section-title">Por portador</div>
+    <div class="port-grid" id="portGrid"></div>
+
+    <div id="intlBanner"></div>
+
+    <div class="section-title">Lançamentos</div>
+    <div class="table-controls">
+      <div class="filter-row" id="filterRow"></div>
+      <input class="search-input" id="searchInput" placeholder="buscar descrição…" oninput="renderTable()" aria-label="Buscar lançamento">
+    </div>
+    <div class="table-wrap">
+      <div class="table-hdr">
+        <span class="table-hdr-title" id="tblCount">—</span>
+        <span class="table-hdr-total" id="tblTotal">—</span>
+      </div>
+      <div class="scroll-tbl">
+        <table class="tbl" id="mainTbl" aria-label="Lançamentos da fatura">
+          <thead>
+            <tr>
+              <th class="col-data" onclick="sortBy('data')">Data <i class="ti ti-selector" style="font-size:10px"></i></th>
+              <th class="col-desc" onclick="sortBy('descricao')">Descrição</th>
+              <th class="col-cidade" onclick="sortBy('cidade')">Local</th>
+              <th class="col-cat" onclick="sortBy('categoria')">Categoria</th>
+              <th class="col-port" onclick="sortBy('portador')">Portador</th>
+              <th class="col-val" onclick="sortBy('valor')" style="text-align:right">Valor R$ <i class="ti ti-selector" style="font-size:10px"></i></th>
+            </tr>
+          </thead>
+          <tbody id="tblBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="btn btn-primary" onclick="exportExcel()">
+        <i class="ti ti-table-export" aria-hidden="true"></i>Exportar Excel (.xlsx)
+      </button>
+      <button class="btn btn-secondary" onclick="exportCSV()">
+        <i class="ti ti-file-text" aria-hidden="true"></i>Exportar CSV
+      </button>
+      <button class="btn btn-outline" onclick="resetApp()">
+        <i class="ti ti-refresh" aria-hidden="true"></i>Nova fatura
+      </button>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <span>ledgr v1.0 · processamento 100% local · nenhum dado enviado</span>
+    <span id="footerDate"></span>
+  </footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+// ─── State ───────────────────────────────────────────────────────────────────
+let allRows = [];
+let currentFilter = 'todos';
+let sortField = 'data';
+let sortAsc = true;
+
+// ─── Category config ─────────────────────────────────────────────────────────
+const CAT_COLORS = {
+  'ALIMENTAÇÃO':           '#2d5a3d',
+  'SAÚDE':                 '#2b5fa4',
+  'VEÍCULOS':              '#c47c2b',
+  'MORADIA':               '#6b4fbb',
+  'VESTUÁRIO':             '#b84040',
+  'TURISMO E ENTRETENIM.': '#1a7a6e',
+  'DIVERSOS':              '#888780',
+  'EDUCAÇÃO':              '#4a6fa5',
+  'HOBBY':                 '#8b5e3c',
+  'PRODUTOS/SERVIÇOS':     '#555555',
+};
+const CAT_BADGE = {
+  'ALIMENTAÇÃO': 'bg-green', 'SAÚDE': 'bg-blue', 'VEÍCULOS': 'bg-amber',
+  'MORADIA': 'bg-purple', 'VESTUÁRIO': 'bg-red', 'TURISMO E ENTRETENIM.': 'bg-teal',
+  'DIVERSOS': 'bg-gray', 'EDUCAÇÃO': 'bg-blue', 'HOBBY': 'bg-brown',
+  'PRODUTOS/SERVIÇOS': 'bg-gray',
+};
+
+const PORTADOR_FINALS = {
+  'PHILIPPE PAULO MACRIDIS': '8140',
+  'MARIA A B R BITTENCOUR':  '7613',
+  'LUIZ CARLOS S A DUARTE':  '3613',
+};
+
+// ─── DOM helpers ─────────────────────────────────────────────────────────────
+const $  = id => document.getElementById(id);
+const dz = $('dropZone');
+const fi = $('fileInput');
+
+document.addEventListener('DOMContentLoaded', () => {
+  $('footerDate').textContent = new Date().toLocaleDateString('pt-BR', {day:'2-digit',month:'long',year:'numeric'});
+});
+
+// ─── Drag & drop ─────────────────────────────────────────────────────────────
+dz.addEventListener('dragover',  e => { e.preventDefault(); dz.classList.add('drag'); });
+dz.addEventListener('dragleave', ()  => dz.classList.remove('drag'));
+dz.addEventListener('drop', e => {
+  e.preventDefault(); dz.classList.remove('drag');
+  const f = e.dataTransfer.files[0];
+  if (f && f.type === 'application/pdf') processPDF(f);
+  else setStatus('Apenas arquivos PDF são aceitos.', 'err');
+});
+fi.addEventListener('change', e => { if (e.target.files[0]) processPDF(e.target.files[0]); });
+
+// ─── Status / progress ───────────────────────────────────────────────────────
+function setStatus(msg, type = '') {
+  $('statusBar').textContent = msg;
+  $('statusBar').className = 'status-bar ' + type;
+}
+function setProgress(p) {
+  $('loadingFill').style.width = p + '%';
+}
+
+// ─── PDF processing ──────────────────────────────────────────────────────────
+async function processPDF(file) {
+  setStatus('Lendo PDF…', 'loading');
+  $('loadingBar').classList.add('active');
+  setProgress(5);
+  try {
+    const ab = await file.arrayBuffer();
+    setProgress(15);
+    const pdf = await pdfjsLib.getDocument({ data: ab }).promise;
+    let fullText = '';
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const tc   = await page.getTextContent();
+      // Preserve spatial layout via y-position grouping
+      const items = tc.items;
+      const byY   = {};
+      items.forEach(it => {
+        const y = Math.round(it.transform[5]);
+        if (!byY[y]) byY[y] = [];
+        byY[y].push(it.str);
+      });
+      const sorted = Object.keys(byY).sort((a,b) => b - a);
+      fullText += sorted.map(y => byY[y].join(' ')).join('\n') + '\n---PAGE---\n';
+      setProgress(15 + Math.round(55 * i / pdf.numPages));
+    }
+    setProgress(75);
+    const rows = parseInvoice(fullText);
+    setProgress(100);
+
+    if (rows.length === 0) {
+      setStatus('Nenhum lançamento encontrado. Verifique se o PDF tem texto selecionável.', 'err');
+      $('loadingBar').classList.remove('active');
+      return;
+    }
+    allRows = rows;
+    renderSummary(rows);
+    $('headerMeta').textContent = file.name + ' · ' + rows.length + ' lançamentos';
+    setStatus('✓ ' + rows.length + ' lançamentos extraídos com sucesso.', 'ok');
+    $('loadingBar').classList.remove('active');
+  } catch (err) {
+    setStatus('Erro ao processar PDF: ' + err.message, 'err');
+    $('loadingBar').classList.remove('active');
+    console.error(err);
+  }
+}
+
+// ─── Invoice parser ───────────────────────────────────────────────────────────
+function parseInvoice(text) {
+  const rows = [];
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+
+  // Detect section boundaries for each portador
+  const portSections = [];
+  const portPatterns = [
+    { re: /PHILIPPE PAULO MACRIDIS/i,        name: 'Philippe Paulo Macridis', final: '8140' },
+    { re: /MARIA A B R BITTENCOUR/i,          name: 'Maria A B R Bittencour',  final: '7613' },
+    { re: /LUIZ CARLOS S A DUARTE/i,          name: 'Luiz Carlos S A Duarte',  final: '3613' },
+  ];
+  lines.forEach((line, idx) => {
+    portPatterns.forEach(pp => {
+      if (pp.re.test(line)) {
+        portSections.push({ idx, name: pp.name, final: pp.final });
+      }
+    });
+  });
+
+  function portadorAt(lineIdx) {
+    let p = { name: 'Titular', final: '0000' };
+    for (const s of portSections) {
+      if (s.idx <= lineIdx) p = s;
+    }
+    return p;
+  }
+
+  // Category names for detection
+  const CAT_NAMES = [
+    'ALIMENTAÇÃO','SAÚDE','VEÍCULOS','MORADIA','VESTUÁRIO',
+    'TURISMO E ENTRETENIM.','DIVERSOS','EDUCAÇÃO','HOBBY','PRODUTOS/SERVIÇOS'
+  ];
+
+  // Regexes
+  const TX_RE   = /^(\d{2}\/\d{2})\s+(.+?)\s+([-]?\d{1,3}(?:\.\d{3})*,\d{2})\s*$/;
+  const CAT_RE  = /^(ALIMENTAÇÃO|SAÚDE|VEÍCULOS|MORADIA|VESTUÁRIO|TURISMO E ENTRETENIM\.|DIVERSOS|EDUCAÇÃO|HOBBY|PRODUTOS\/SERVIÇOS)\s*\.?\s*(.*)?$/i;
+  const INTL_RE = /(USD|EUR|GBP|ARS|CLP|MXN)/;
+
+  // Parcel tracking
+  const PARCEL_RE = /(\d{2}\/\d{2})\s*$/;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const m = TX_RE.exec(line);
+    if (!m) continue;
+
+    const dateStr = m[1];
+    let desc      = m[2].trim();
+    const valStr  = m[3];
+    const val     = parseFloat(valStr.replace(/\./g, '').replace(',', '.'));
+
+    // Look ahead for category line
+    const next1 = lines[i + 1] || '';
+    const next2 = lines[i + 2] || '';
+    let cat  = 'DIVERSOS';
+    let city = '';
+    for (const nl of [next1, next2]) {
+      const cm = CAT_RE.exec(nl);
+      if (cm) {
+        cat  = cm[1].toUpperCase().trim();
+        city = (cm[2] || '').replace(/\.$/, '').trim();
+        break;
+      }
+    }
+
+    // Detect international
+    const intl = INTL_RE.test(next1) || INTL_RE.test(next2) || INTL_RE.test(desc);
+    let moeda = 'BRL';
+    if (intl) {
+      const mm = INTL_RE.exec(next1 + ' ' + next2 + ' ' + desc);
+      if (mm) moeda = mm[1];
+    }
+
+    // Detect parcel info (e.g. "01/12", "02/03")
+    let parcela = '', totalParcelas = '';
+    const pm = desc.match(/(\d{2})\/(\d{2})\s*$/);
+    if (pm) {
+      parcela      = pm[1];
+      totalParcelas = pm[2];
+      desc = desc.replace(/\s*\d{2}\/\d{2}\s*$/, '').trim();
+    }
+
+    const port = portadorAt(i);
+
+    rows.push({
+      data:          dateStr,
+      descricao:     desc,
+      cidade:        city,
+      categoria:     cat,
+      portador:      port.name,
+      cartao_final:  port.final,
+      valor:         val,
+      tipo:          val < 0 ? 'crédito/estorno' : 'débito',
+      internacional: intl,
+      moeda:         moeda,
+      parcela:       parcela,
+      total_parcelas: totalParcelas,
+    });
+  }
+
+  // Fallback: broader match if too few found
+  if (rows.length < 3) return parseFallback(text);
+  return rows;
+}
+
+function parseFallback(text) {
+  const rows = [];
+  const RE = /(\d{2}\/\d{2})\s+([A-Z\*][A-Z0-9 \*\.\-\/]+?)\s+([-]?\d{1,3}(?:\.\d{3})*,\d{2})/g;
+  let m;
+  while ((m = RE.exec(text)) !== null) {
+    const val = parseFloat(m[3].replace(/\./g,'').replace(',','.'));
+    rows.push({
+      data: m[1], descricao: m[2].trim(), cidade: '', categoria: 'DIVERSOS',
+      portador: 'Titular', cartao_final: '0000', valor: val,
+      tipo: val < 0 ? 'crédito/estorno' : 'débito',
+      internacional: false, moeda: 'BRL', parcela: '', total_parcelas: ''
+    });
+  }
+  return rows;
+}
+
+// ─── Formatters ───────────────────────────────────────────────────────────────
+function brl(v) {
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
+}
+function num2(v) {
+  return new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v);
+}
+
+// ─── Render summary ──────────────────────────────────────────────────────────
+function renderSummary(rows) {
+  const debits   = rows.filter(r => r.valor > 0);
+  const credits  = rows.filter(r => r.valor < 0);
+  const total    = debits.reduce((s, r) => s + r.valor, 0);
+  const totalCred = credits.reduce((s, r) => s + r.valor, 0);
+  const intlRows = debits.filter(r => r.internacional);
+  const intlTotal = intlRows.reduce((s, r) => s + r.valor, 0);
+
+  // KPIs
+  $('kpiRow').innerHTML = `
+    <div class="kpi"><div class="kpi-label">Total da fatura</div><div class="kpi-val">${brl(total)}</div><div class="kpi-sub">${debits.length} lançamentos</div></div>
+    <div class="kpi"><div class="kpi-label">Créditos / estornos</div><div class="kpi-val" style="color:var(--accent)">${brl(Math.abs(totalCred))}</div><div class="kpi-sub">${credits.length} lançamentos</div></div>
+    <div class="kpi"><div class="kpi-label">Internacional</div><div class="kpi-val" style="color:var(--info)">${brl(intlTotal)}</div><div class="kpi-sub">${intlRows.length} transações</div></div>
+    <div class="kpi"><div class="kpi-label">Saldo líquido</div><div class="kpi-val">${brl(total + totalCred)}</div><div class="kpi-sub">débitos + estornos</div></div>
+  `;
+
+  // Categories
+  const cats = {};
+  debits.forEach(r => { cats[r.categoria] = (cats[r.categoria] || 0) + r.valor; });
+  const catsSorted = Object.entries(cats).sort((a, b) => b[1] - a[1]);
+  const maxCat = catsSorted[0] ? catsSorted[0][1] : 1;
+  $('catGrid').innerHTML = catsSorted.map(([cat, amt]) => {
+    const pct   = (amt / total * 100).toFixed(1);
+    const color = CAT_COLORS[cat] || '#888';
+    const barW  = Math.round(amt / maxCat * 100);
+    return `<div class="cat-card">
+      <div class="cat-dot" style="background:${color}"></div>
+      <div class="cat-info">
+        <div class="cat-name">${cat}</div>
+        <div class="cat-amt">${brl(amt)}</div>
+        <div class="cat-pct">${pct}% do total</div>
+        <div class="bar-bg"><div class="bar-fill" style="width:${barW}%;background:${color}"></div></div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Portadores
+  const ports = {};
+  rows.forEach(r => {
+    const k = r.cartao_final;
+    if (!ports[k]) ports[k] = { nome: r.portador, final: r.cartao_final, total: 0, count: 0 };
+    if (r.valor > 0) { ports[k].total += r.valor; ports[k].count++; }
+  });
+  $('portGrid').innerHTML = Object.values(ports).sort((a,b) => b.total - a.total).map(p => `
+    <div class="port-card">
+      <div class="port-name">${p.nome}</div>
+      <div class="port-final">cartão ••••${p.final}</div>
+      <div class="port-total">${brl(p.total)}</div>
+      <div class="port-sub">${p.count} lançamentos</div>
+    </div>
+  `).join('');
+
+  // International banner
+  if (intlRows.length > 0) {
+    const curs = [...new Set(intlRows.map(r => r.moeda))].join(', ');
+    $('intlBanner').innerHTML = `<div class="intl-banner"><i class="ti ti-world" aria-hidden="true"></i>
+      <span><strong>${intlRows.length} transações internacionais</strong> · total ${brl(intlTotal)} · moedas detectadas: ${curs} · IOF incluído nos valores</span>
+    </div>`;
+  } else {
+    $('intlBanner').innerHTML = '';
+  }
+
+  // Filter buttons
+  const portFinals = ['todos', ...Object.keys(ports)];
+  $('filterRow').innerHTML = portFinals.map(f => {
+    const label = f === 'todos' ? 'Todos' : (ports[f] ? ports[f].nome.split(' ')[0] + ' ••' + f : '••' + f);
+    const active = f === currentFilter ? 'active' : '';
+    return `<button class="filter-btn ${active}" onclick="filterTable('${f}')">${label}</button>`;
+  }).join('');
+
+  renderTable();
+  $('summary').classList.add('visible');
+}
+
+// ─── Table render ─────────────────────────────────────────────────────────────
+function getFilteredRows() {
+  const q = ($('searchInput').value || '').toLowerCase().trim();
+  let rows = currentFilter === 'todos'
+    ? allRows
+    : allRows.filter(r => r.cartao_final === currentFilter);
+  if (q) rows = rows.filter(r =>
+    r.descricao.toLowerCase().includes(q) ||
+    r.cidade.toLowerCase().includes(q) ||
+    r.categoria.toLowerCase().includes(q)
+  );
+  // Sort
+  rows = [...rows].sort((a, b) => {
+    let av = a[sortField], bv = b[sortField];
+    if (sortField === 'valor') { av = +av; bv = +bv; }
+    if (av < bv) return sortAsc ? -1 : 1;
+    if (av > bv) return sortAsc ? 1  : -1;
+    return 0;
+  });
+  return rows;
+}
+
+function renderTable() {
+  const rows  = getFilteredRows();
+  const total = rows.reduce((s, r) => s + r.valor, 0);
+  $('tblCount').textContent = rows.length + ' lançamentos';
+  $('tblTotal').textContent = 'Σ ' + brl(total);
+  $('tblBody').innerHTML = rows.map(r => {
+    const bc  = CAT_BADGE[r.categoria] || 'bg-gray';
+    const catLabel = r.categoria.length > 15 ? r.categoria.substring(0, 15) + '…' : r.categoria;
+    const amtClass = r.valor < 0 ? 'amt-neg' : r.internacional ? 'amt-intl' : 'amt-pos';
+    const descFull  = r.descricao + (r.parcela ? ` [${r.parcela}/${r.total_parcelas}]` : '');
+    const descShort = descFull.length > 30 ? descFull.substring(0, 30) + '…' : descFull;
+    return `<tr>
+      <td class="col-data"  style="font-family:'DM Mono',monospace;font-size:11px;color:var(--ink3)">${r.data}</td>
+      <td class="col-desc"  title="${r.descricao}">${descShort}</td>
+      <td class="col-cidade" style="font-size:11px;color:var(--ink3)">${r.cidade || '—'}</td>
+      <td class="col-cat"><span class="badge ${bc}">${catLabel}</span></td>
+      <td class="col-port" style="font-size:11px"><span title="${r.portador}">${r.portador.split(' ')[0]} ••${r.cartao_final}</span></td>
+      <td class="col-val"  style="text-align:right"><span class="${amtClass}">${num2(r.valor)}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+function filterTable(f) {
+  currentFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b => {
+    b.classList.toggle('active', b.textContent.trim().includes(f === 'todos' ? 'Todos' : f));
+  });
+  renderTable();
+}
+
+function sortBy(field) {
+  if (sortField === field) sortAsc = !sortAsc;
+  else { sortField = field; sortAsc = true; }
+  renderTable();
+}
+
+// ─── Export Excel ─────────────────────────────────────────────────────────────
+function exportExcel() {
+  if (!allRows.length) return;
+  const wb = XLSX.utils.book_new();
+
+  // Sheet 1: All transactions
+  const headers = ['Data','Descrição','Cidade/Local','Categoria','Portador','Cartão Final','Valor R$','Tipo','Internacional','Moeda','Parcela','Total Parcelas'];
+  const wsData  = [headers, ...allRows.map(r => [
+    r.data, r.descricao, r.cidade, r.categoria, r.portador,
+    r.cartao_final, r.valor, r.tipo,
+    r.internacional ? 'Sim' : 'Não', r.moeda,
+    r.parcela || '', r.total_parcelas || ''
+  ])];
+  const ws1 = XLSX.utils.aoa_to_sheet(wsData);
+  // Column widths
+  ws1['!cols'] = [10,35,18,22,28,12,14,16,13,8,9,14].map(w => ({ wch: w }));
+  XLSX.utils.book_append_sheet(wb, ws1, 'Lançamentos');
+
+  // Sheet 2: By category
+  const cats = {};
+  allRows.filter(r => r.valor > 0).forEach(r => { cats[r.categoria] = (cats[r.categoria] || 0) + r.valor; });
+  const total = Object.values(cats).reduce((a,b) => a+b, 0);
+  const ws2Data = [['Categoria','Total R$','% do Total','Qtd'],
+    ...Object.entries(cats).sort((a,b) => b[1]-a[1]).map(([cat, amt]) => [
+      cat,
+      parseFloat(amt.toFixed(2)),
+      parseFloat((amt/total*100).toFixed(2)),
+      allRows.filter(r => r.categoria === cat && r.valor > 0).length
+    ])
+  ];
+  const ws2 = XLSX.utils.aoa_to_sheet(ws2Data);
+  ws2['!cols'] = [22,14,12,8].map(w => ({ wch: w }));
+  XLSX.utils.book_append_sheet(wb, ws2, 'Por Categoria');
+
+  // Sheet 3: By portador
+  const ports = {};
+  allRows.forEach(r => {
+    const k = r.cartao_final;
+    if (!ports[k]) ports[k] = { nome: r.portador, final: r.cartao_final, total: 0, count: 0, intl: 0 };
+    if (r.valor > 0) { ports[k].total += r.valor; ports[k].count++; }
+    if (r.internacional && r.valor > 0) ports[k].intl += r.valor;
+  });
+  const ws3Data = [['Portador','Cartão Final','Total R$','Qtd Lançamentos','Total Internacional R$'],
+    ...Object.values(ports).sort((a,b) => b.total-a.total).map(p => [
+      p.nome, p.final,
+      parseFloat(p.total.toFixed(2)), p.count,
+      parseFloat(p.intl.toFixed(2))
+    ])
+  ];
+  const ws3 = XLSX.utils.aoa_to_sheet(ws3Data);
+  ws3['!cols'] = [28,12,14,16,20].map(w => ({ wch: w }));
+  XLSX.utils.book_append_sheet(wb, ws3, 'Por Portador');
+
+  // Sheet 4: International
+  const intlRows = allRows.filter(r => r.internacional);
+  if (intlRows.length > 0) {
+    const ws4Data = [['Data','Descrição','Cidade','Moeda','Valor R$','Portador','Cartão Final'],
+      ...intlRows.map(r => [r.data, r.descricao, r.cidade, r.moeda, r.valor, r.portador, r.cartao_final])
+    ];
+    const ws4 = XLSX.utils.aoa_to_sheet(ws4Data);
+    ws4['!cols'] = [10,35,18,8,14,28,12].map(w => ({ wch: w }));
+    XLSX.utils.book_append_sheet(wb, ws4, 'Internacional');
+  }
+
+  const hoje = new Date().toISOString().split('T')[0];
+  XLSX.writeFile(wb, `ledgr_fatura_${hoje}.xlsx`);
+}
+
+// ─── Export CSV ───────────────────────────────────────────────────────────────
+function exportCSV() {
+  if (!allRows.length) return;
+  const headers = ['Data','Descricao','Cidade','Categoria','Portador','Cartao_Final','Valor','Tipo','Internacional','Moeda'];
+  const lines = [headers.join(';'), ...allRows.map(r => [
+    r.data,
+    '"' + r.descricao.replace(/"/g, '""') + '"',
+    r.cidade,
+    r.categoria,
+    r.portador,
+    r.cartao_final,
+    String(r.valor).replace('.', ','),
+    r.tipo,
+    r.internacional ? 'Sim' : 'Nao',
+    r.moeda
+  ].join(';'))];
+  const blob = new Blob(['\uFEFF' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `ledgr_fatura_${new Date().toISOString().split('T')[0]}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ─── Reset ────────────────────────────────────────────────────────────────────
+function resetApp() {
+  allRows = [];
+  currentFilter = 'todos';
+  sortField = 'data';
+  sortAsc = true;
+  $('summary').classList.remove('visible');
+  setStatus('Aguardando arquivo…', '');
+  $('fileInput').value = '';
+  $('headerMeta').textContent = 'Itaú Empresas · PDF → Excel';
+  $('loadingBar').classList.remove('active');
+  $('loadingFill').style.width = '0%';
+}
+</script>
+</body>
+</html>
